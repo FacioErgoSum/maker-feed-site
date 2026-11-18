@@ -5,7 +5,7 @@ Stdlib only. Works with zero keys (channel RSS feeds). Optional:
   YOUTUBE_API_KEY    -> discovery search for maker videos beyond your channel list
   ANTHROPIC_API_KEY  -> a Claude "vibe check" that drops anything doomer-ish the keywords missed
 """
-import json, os, re, sys, time, datetime as dt
+import json, math, os, re, sys, time, datetime as dt
 import urllib.request, urllib.parse, urllib.error
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -21,6 +21,7 @@ PER_CHANNEL = 2
 WINDOW_HOURS = 48          # "of the day" with some slack for timezones/slow uploaders
 FALLBACK_HOURS = 24 * 7    # widen if the day was quiet
 MIN_VIDEOS = 12
+INDIE_SHARE = 0.5         # at least this fraction of the feed comes from the indie list
 
 # Anything matching these is dropped (except 'always' channels).
 BLOCK = [
@@ -177,22 +178,46 @@ def hours_old(v, now):
     return max((now - t).total_seconds() / 3600, 1.0)
 
 
-def score(v, now):
+def vph(v, now):
     # views per hour, softened so a 2-hour-old video doesn't get an unfair boost
     return v["views"] / (max(hours_old(v, now), 3) ** 0.85)
+
+
+def add_baselines(pool, now):
+    """Each channel's median views/hour across its recent uploads. Scoring against a
+    channel's own baseline means a 5K-sub maker's breakout video can beat a big
+    channel's average upload."""
+    by = {}
+    for v in pool:
+        by.setdefault(v["channelId"], []).append(vph(v, now))
+    med = {c: sorted(xs)[len(xs) // 2] for c, xs in by.items()}
+    for v in pool:
+        v["_base"] = med.get(v["channelId"], 0)
+
+
+def score(v, now):
+    base = v.get("_base") or 0
+    rel = vph(v, now) / max(base, 1.0) if base else 1.0
+    return rel * math.log10(v["views"] + 10)
 
 
 def select(pool, now, window_h):
     fresh = [v for v in pool if hours_old(v, now) <= window_h]
     fresh.sort(key=lambda v: score(v, now), reverse=True)
     picked, per = [], {}
-    for v in fresh:
-        if per.get(v["channelId"], 0) >= PER_CHANNEL:
-            continue
-        per[v["channelId"]] = per.get(v["channelId"], 0) + 1
-        picked.append(v)
-        if len(picked) >= MAX_VIDEOS:
-            break
+
+    def take(cands, limit):
+        for v in cands:
+            if len(picked) >= limit:
+                return
+            if v in picked or per.get(v["channelId"], 0) >= PER_CHANNEL:
+                continue
+            per[v["channelId"]] = per.get(v["channelId"], 0) + 1
+            picked.append(v)
+
+    take([v for v in fresh if v.get("tier") == "indie"], math.ceil(MAX_VIDEOS * INDIE_SHARE))
+    take(fresh, MAX_VIDEOS)
+    picked.sort(key=lambda v: score(v, now), reverse=True)
     return picked
 
 
@@ -202,12 +227,25 @@ def main():
     cache = json.load(open(CACHE)) if os.path.exists(CACHE) else {}
 
     print("Resolving channels…")
-    handles = [(h, "always") for h in cfg["always"]] + [(h, "maker") for h in cfg["makers"]]
+    entries = [(e, tier) for tier in ("always", "indie", "makers") for e in cfg.get(tier, [])]
+
+    def to_id(e):
+        if isinstance(e, list):
+            return e[1]
+        if e.startswith("UC") and len(e) == 24:
+            return e
+        return resolve(e, cache)
+
     with ThreadPoolExecutor(8) as ex:
-        ids = list(ex.map(lambda hs: (resolve(hs[0], cache), hs[1]), handles))
+        ids = list(ex.map(lambda et: (to_id(et[0]), et[1]), entries))
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     json.dump(cache, open(CACHE, "w"), indent=2, sort_keys=True)
-    always_ids = {cid for cid, src in ids if cid and src == "always"}
+    tier_of = {}
+    for cid, tier in ids:
+        if cid:
+            tier_of.setdefault(cid, tier)
+    always_ids = {c for c, t in tier_of.items() if t == "always"}
+    ids = list(tier_of.items())
 
     print("Fetching feeds…")
     with ThreadPoolExecutor(8) as ex:
@@ -218,6 +256,8 @@ def main():
         pool += discover(cfg.get("search_queries", []), now - dt.timedelta(hours=WINDOW_HOURS),
                          os.environ["YOUTUBE_API_KEY"])
 
+    add_baselines(pool, now)
+
     # dedupe, flag, keyword-filter
     seen, clean = set(), []
     for v in pool:
@@ -225,6 +265,7 @@ def main():
             continue
         seen.add(v["id"])
         v["always"] = v["channelId"] in always_ids
+        v["tier"] = tier_of.get(v["channelId"], "discover")
         if not v["always"] and BLOCK_RE.search(v["title"]):
             continue
         clean.append(v)
@@ -245,6 +286,7 @@ def main():
 
     for v in picked:
         v["description"] = v["description"][:280]
+        v.pop("_base", None)
     feed = {"generated": now.isoformat(timespec="seconds"), "count": len(picked), "videos": picked}
 
     os.makedirs(os.path.join(DOCS, "archive"), exist_ok=True)
