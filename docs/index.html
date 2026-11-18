@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Bench — today's best maker videos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f6f1e7; --ink:#1d1b16; --muted:#6f685b; --line:#e3dac8;
+    --grid:rgba(40,90,140,.07); --accent:#ff6a2b; --mask:#1f7a4d; --card:#fffdf8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#14130f; --ink:#f2ecdf; --muted:#a39a88; --line:#2c2921;
+           --grid:rgba(120,170,220,.06); --card:#1c1a15; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:24px 24px}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+    border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:26px}
+  h1{font:800 clamp(40px,7vw,76px)/.9 Fraunces,serif;margin:0;letter-spacing:-.02em}
+  h1 em{font-style:normal;color:var(--accent)}
+  .sub{font:400 13px/1.4 "JetBrains Mono",monospace;color:var(--muted);margin-top:10px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;font:13px "JetBrains Mono",monospace}
+  select,button.chip{font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--ink);
+    border-radius:999px;padding:7px 14px;cursor:pointer}
+  button.chip[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+
+  .feature{display:grid;grid-template-columns:1.7fr 1fr;gap:22px;margin-bottom:34px}
+  @media (max-width:820px){.feature{grid-template-columns:1fr}}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px}
+
+  .card{background:var(--card);border:1.5px solid var(--ink);border-radius:14px;overflow:hidden;
+    box-shadow:4px 4px 0 var(--ink);transition:transform .15s, box-shadow .15s;display:flex;flex-direction:column}
+  .card:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink)}
+  .card.watched{opacity:.45}
+  .player{position:relative;aspect-ratio:16/9;background:#000;cursor:pointer}
+  .player img{width:100%;height:100%;object-fit:cover;display:block}
+  .player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .play{position:absolute;inset:0;display:grid;place-items:center}
+  .play span{width:62px;height:62px;border-radius:50%;background:var(--accent);display:grid;place-items:center;
+    box-shadow:0 4px 20px rgba(0,0,0,.35);transition:transform .15s}
+  .player:hover .play span{transform:scale(1.1)}
+  .play svg{margin-left:4px}
+  .meta{padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .chan{font:600 12px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.05em;color:var(--mask);
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .tag{background:var(--accent);color:#fff;border-radius:4px;padding:1px 6px;font-size:10px}
+  .title{font:500 18px/1.25 Fraunces,serif;margin:0}
+  .feature .big .title{font-size:clamp(22px,3vw,30px)}
+  .blurb{color:var(--muted);font-size:14px;margin:0}
+  .foot{margin-top:auto;padding-top:6px;display:flex;justify-content:space-between;font:12px "JetBrains Mono",monospace;color:var(--muted)}
+  .foot a{color:inherit}
+  .side{display:flex;flex-direction:column;gap:22px}
+  .side .card{flex-direction:row}
+  .side .player{width:46%;flex:none;aspect-ratio:auto}
+  .side .title{font-size:16px}
+  @media (max-width:820px){.side .card{flex-direction:column}.side .player{width:100%;aspect-ratio:16/9}}
+  .empty{padding:60px 0;text-align:center;font:15px "JetBrains Mono",monospace;color:var(--muted)}
+  footer{margin-top:50px;font:12px "JetBrains Mono",monospace;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>The <em>Bench</em></h1>
+      <div class="sub" id="sub">loading today's builds…</div>
+    </div>
+    <div class="controls">
+      <select id="day" aria-label="Pick a day"></select>
+      <button class="chip" id="hide" aria-pressed="false">hide watched</button>
+    </div>
+  </header>
+  <main id="main"></main>
+  <footer>no doom · no markets · no news (except Fireship &amp; AI Explained) · refreshed daily</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d } catch { return d } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
+};
+let watched = new Set(store.get('watched', []));
+let hide = store.get('hideWatched', false);
+let feed = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ago = iso => {
+  const h = (Date.now() - new Date(iso)) / 36e5;
+  return h < 1 ? 'just now' : h < 24 ? `${Math.round(h)}h ago` : `${Math.round(h/24)}d ago`;
+};
+const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : n ? String(n) : '';
+
+function card(v){
+  const blurb = v.blurb || (v.description || '').split('\n')[0].slice(0, 140);
+  return `<article class="card ${watched.has(v.id) ? 'watched' : ''}" data-id="${esc(v.id)}">
+    <div class="player" data-id="${esc(v.id)}">
+      <img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="">
+      <div class="play"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M6 4l15 8-15 8z"/></svg></span></div>
+    </div>
+    <div class="meta">
+      <div class="chan">${esc(v.channel)}${v.always ? '<span class="tag">always on</span>' : ''}${v.source==='discover' ? '<span class="tag" style="background:var(--mask)">new find</span>' : ''}</div>
+      <h2 class="title">${esc(v.title)}</h2>
+      ${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}
+      <div class="foot"><span>${ago(v.published)}${v.views ? ' · ' + fmt(v.views) + ' views' : ''}</span>
+        <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">open ↗</a></div>
+    </div>
+  </article>`;
+}
+
+function render(){
+  const vids = (feed?.videos || []).filter(v => !(hide && watched.has(v.id)));
+  if (!vids.length){ $('#main').innerHTML = `<div class="empty">nothing here yet — check back after the next daily run.</div>`; return; }
+  const [top, ...rest] = vids;
+  $('#main').innerHTML = `
+    <section class="feature"><div class="big">${card(top)}</div>
+      <div class="side">${rest.slice(0,3).map(card).join('')}</div></section>
+    <section class="grid">${rest.slice(3).map(card).join('')}</section>`;
+}
+
+document.addEventListener('click', e => {
+  const p = e.target.closest('.player');
+  if (!p || p.querySelector('iframe')) return;
+  const id = p.dataset.id;
+  p.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  watched.add(id); store.set('watched', [...watched].slice(-2000));
+});
+
+$('#hide').setAttribute('aria-pressed', hide);
+$('#hide').onclick = () => { hide = !hide; store.set('hideWatched', hide); $('#hide').setAttribute('aria-pressed', hide); render(); };
+
+async function load(day){
+  const url = day ? `archive/${day}.json` : 'feed.json';
+  try { feed = await (await fetch(url + '?t=' + Date.now())).json(); }
+  catch { feed = null; }
+  const when = feed ? new Date(feed.generated) : null;
+  $('#sub').textContent = when
+    ? `${feed.count} builds · curated ${when.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}`
+    : 'no feed found';
+  render();
+}
+
+(async () => {
+  try {
+    const days = await (await fetch('archive/index.json?t=' + Date.now())).json();
+    $('#day').innerHTML = `<option value="">today</option>` + days.slice(1).map(d => `<option>${d}</option>`).join('');
+  } catch { $('#day').innerHTML = `<option value="">today</option>`; }
+  $('#day').onchange = e => load(e.target.value);
+  load('');
+})();
+</script>
+</body>
+</html>

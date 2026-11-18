@@ -1,0 +1,30 @@
+name: Build daily feed
+
+on:
+  schedule:
+    - cron: "17 12 * * *"   # ~5:17am Mountain (12:17 UTC)
+  workflow_dispatch:         # "Run workflow" button for a manual refresh
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build feed
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}       # optional
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # optional
+        run: python scripts/build_feed.py
+      - name: Commit
+        run: |
+          git config user.name "the-bench-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs data
+          git diff --cached --quiet || git commit -m "feed: $(date -u +%F)"
+          git push
