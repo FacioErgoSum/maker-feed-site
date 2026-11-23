@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install Pillow (thumbnail analysis)
+        run: pip install pillow
       - name: Build feed
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}       # optional

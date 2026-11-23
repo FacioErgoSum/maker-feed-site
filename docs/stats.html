@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stats · The Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff0033'/%3E%3Cpath d='M4 11h24v4H4zM7 15h3v11H7zm15 0h3v11h-3zM7 20h18v2.5H7z' fill='%23fff'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#ffffff; --ink:#0f0f0f; --muted:#606060; --line:#e5e5e5; --card:#ffffff; --chip:#f2f2f2; --chip-hover:#e5e5e5;
+    --red:#ff0033; --s1:#2a78d6; --s2:#eb6834; --gridline:#ececec; --hover:#f2f2f2;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:#0f0f0f; --ink:#f1f1f1; --muted:#aaaaaa; --line:#3f3f3f; --card:#212121; --chip:#272727; --chip-hover:#3f3f3f;
+           --s1:#3987e5; --s2:#d95926; --gridline:#333333; --hover:#272727; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 Roboto,Arial,sans-serif}
+  a{color:inherit}
+  .mast{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--paper)}
+  .logo{display:flex;align-items:center;gap:4px;font:700 19px/1 Roboto,sans-serif;letter-spacing:-.6px;text-decoration:none}
+  .logo .mark{width:26px;height:26px;border-radius:7px;background:var(--red);display:grid;place-items:center;margin-right:3px}
+  .logo .word{display:flex}
+  .logo sup{font:400 10px Roboto;color:var(--muted);letter-spacing:0;margin-left:2px;align-self:flex-start;margin-top:-2px}
+  .mast nav{display:flex;gap:8px;align-items:center}
+  .mast nav a{height:36px;padding:0 14px;border-radius:18px;display:flex;align-items:center;text-decoration:none;font:500 14px Roboto}
+  .mast nav a:hover{background:var(--hover)}
+  .mast nav a[aria-current]{background:var(--chip)}
+  .mast nav span{color:var(--muted);font-size:12px;margin-left:6px}
+  .wrap{max-width:1280px;margin:0 auto;padding:4px 24px 80px}
+  h1{font:700 24px/1.2 Roboto,sans-serif;margin:12px 0 2px}
+  .mono{font-family:"Roboto Mono",monospace}
+  .controls{position:sticky;top:56px;z-index:5;background:var(--paper);padding:12px 0;display:flex;flex-wrap:wrap;gap:12px;
+    align-items:center;font:500 14px Roboto;margin-bottom:16px}
+  .seg{display:inline-flex;gap:8px}
+  .seg button{font:500 14px Roboto;color:var(--ink);background:var(--chip);border:0;height:32px;padding:0 12px;border-radius:8px;cursor:pointer}
+  .seg button:hover{background:var(--chip-hover)}
+  .seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+  .sep{width:1px;height:24px;background:var(--line)}
+  label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+  .note{color:var(--muted);font-size:13px}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:30px}
+  @media (max-width:720px){.wrap{padding:4px 12px 60px}.controls{position:static;gap:10px}.tiles{grid-template-columns:1fr 1fr;gap:10px}.tile .v{font-size:22px}.tile:last-child{grid-column:1/3}}
+  .tile{background:var(--chip);border-radius:12px;padding:14px 16px}
+  .tile .l{font:500 13px Roboto;color:var(--muted)}
+  .tile .v{font:700 28px/1.15 Roboto,sans-serif;margin-top:2px}
+  .tile .d{font-size:12px;color:var(--muted)}
+
+  section{margin:38px 0}
+  h2{font:700 20px/1.3 Roboto,sans-serif;margin:0 0 4px}
+  .lede{color:var(--muted);margin:0 0 16px;max-width:760px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 16px 10px;min-width:0}
+  .card h3{font:500 16px Roboto,sans-serif;margin:0}
+  .card .sub{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+  .chart{width:100%}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .chart text{font:11px Roboto,sans-serif;fill:var(--muted)}
+  .chart text.v{fill:var(--ink)}
+  .chart .gl{stroke:var(--gridline);stroke-width:1}
+  .chart .base{stroke:var(--muted);stroke-width:1}
+  .chart .hit{fill:transparent;cursor:default}
+  .chart .hit:hover+.m, .chart g.pt:hover .m{opacity:.8}
+  .legend{display:flex;gap:16px;font:12px Roboto;color:var(--muted);margin:2px 0 6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  details.tv{margin-top:6px;font-size:12.5px}
+  details.tv summary{cursor:pointer;color:var(--muted);font:500 12px Roboto}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font:500 12px Roboto;color:var(--muted);cursor:pointer;white-space:nowrap}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  .tablewrap{overflow-x:auto}
+
+  .top{display:flex;flex-direction:column;gap:12px}
+  .row{display:grid;grid-template-columns:34px 246px 1fr auto;gap:16px;align-items:center;padding:4px 0}
+  @media (max-width:720px){.row{grid-template-columns:24px 128px 1fr;gap:10px}.row .nums{grid-column:2/4;justify-content:flex-start}}
+  .rank{font:500 18px Roboto;text-align:center;color:var(--muted)}
+  .row img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;display:block;background:var(--chip)}
+  .row .t{font:500 16px/1.35 Roboto,sans-serif;color:inherit;text-decoration:none}
+  .row .t:hover{text-decoration:underline}
+  .row .c{font:13px Roboto;color:var(--muted);margin-top:3px}
+  .nums{display:flex;gap:18px;font:12px Roboto;color:var(--muted);text-align:right}
+  .nums b{display:block;font:500 17px Roboto,sans-serif;color:var(--ink)}
+  .why{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .why span{font:12px Roboto;background:var(--chip);border-radius:6px;padding:2px 8px;color:var(--muted)}
+  .tag{border-radius:4px;padding:0 4px;font:500 12px Roboto;margin-left:6px;background:var(--chip);color:var(--muted)}
+
+  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .wall figure{margin:0;background:var(--card);border-radius:12px;overflow:hidden}
+  .wall img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border-radius:12px 12px 0 0;background:var(--chip)}
+  .wall .sw{display:flex;height:10px}
+  .wall figcaption{padding:6px 2px;font:12px Roboto;color:var(--muted)}
+  .wall figcaption b{color:var(--ink)}
+
+  #tip{position:fixed;pointer-events:none;z-index:50;background:#616161;color:#fff;font:12px/1.4 Roboto,sans-serif;
+    padding:7px 9px;border-radius:7px;max-width:280px;opacity:0;transition:opacity .08s}
+  .empty{padding:50px 0;text-align:center;color:var(--muted);font:15px Roboto}
+  footer{margin-top:50px;font:12px Roboto;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<header class="mast">
+  <a class="logo" href="./"><span class="mark"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 5h14v2.5H1zM3 7.5h2V14H3zm8 0h2V14h-2zM3 10.5h10V12H3z" fill="#fff"/></svg></span><span class="word">TheBench<sup>CO</sup></span></a>
+  <nav><a href="./">Home</a><a href="stats.html" aria-current="page">Stats</a><span id="gen"></span></nav>
+</header>
+<div class="wrap">
+  <h1>Stats</h1>
+
+  <div class="controls">
+    <div class="seg" id="range"><button data-v="7" aria-pressed="true">last 7 days</button><button data-v="30">last 30 days</button></div>
+    <span class="sep"></span><div class="seg" id="aud"><button data-v="all" aria-pressed="true">everyone</button><button data-v="indie">indie</button><button data-v="big">100K+</button></div>
+    <span class="sep"></span><div class="seg" id="metric" title="What the bucket charts measure">
+      <button data-v="median" aria-pressed="true">median views</button><button data-v="mean">avg views</button><button data-v="perf">× channel normal</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="shorts"> include Shorts</label>
+  </div>
+
+  <div id="body"><div class="empty">loading…</div></div>
+  <footer>Patterns here are correlations, not proof. "× channel normal" compares a video's views per hour to that channel's usual pace, so small and big channels can be compared fairly.</footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const compact = n => n == null ? '—' : n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/,'') + 'M'
+  : n >= 1e3 ? (n/1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/,'') + 'K' : String(Math.round(n));
+const full = n => n == null ? '—' : Math.round(n).toLocaleString();
+const xfmt = n => n == null ? '—' : (n >= 10 ? Math.round(n) : n.toFixed(1)) + '×';
+const mins = s => s == null ? '—' : s < 3600 ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` : `${Math.floor(s/3600)}h${String(Math.floor(s%3600/60)).padStart(2,'0')}`;
+const median = a => { if (!a.length) return null; const b = [...a].sort((x,y)=>x-y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m-1]+b[m])/2; };
+const mean = a => a.length ? a.reduce((s,x)=>s+x,0)/a.length : null;
+const pct = (a, q) => { const b = [...a].sort((x,y)=>x-y); return b[Math.min(b.length-1, Math.floor(q*b.length))]; };
+
+const state = { range: 7, aud: 'all', metric: 'median', shorts: false };
+let ALL = [], GEN = null;
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip');
+function showTip(e, html){ tip.innerHTML = html; tip.style.opacity = 1;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip(){ tip.style.opacity = 0; }
+document.addEventListener('pointermove', e => { const t = e.target.closest('[data-tip]'); t ? showTip(e, t.dataset.tip) : hideTip(); });
+document.addEventListener('scroll', hideTip, true);
+
+/* ---------- metric helpers ---------- */
+const METRIC = {
+  median: { name: 'median views', of: vs => median(vs.map(v=>v.views)), fmt: compact, full: full },
+  mean:   { name: 'average views', of: vs => mean(vs.map(v=>v.views)), fmt: compact, full: full },
+  perf:   { name: 'median × channel normal', of: vs => median(vs.map(v=>v.perf).filter(x=>x!=null)), fmt: xfmt, full: xfmt },
+};
+const M = () => METRIC[state.metric];
+
+/* ---------- SVG charts ---------- */
+function niceMax(v){ if (!v || v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1,1.5,2,2.5,3,4,5,6,8,10]) if (m*p >= v) return m*p; return 10*p; }
+function roundTopBar(x, y, w, h, r){ r = Math.min(r, w/2, h); if (h <= 0) return '';
+  return `M${x},${y+h}V${y+r}Q${x},${y} ${x+r},${y}H${x+w-r}Q${x+w},${y} ${x+w},${y+r}V${y+h}Z`; }
+function tableView(head, rows){
+  return `<details class="tv"><summary>table view</summary><div class="tablewrap"><table><thead><tr>${head.map((h,i)=>`<th class="${i?'n':''}">${esc(h)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i?'n':''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+}
+
+/* columns: items [{label, value, n, tip}] */
+function columns(items, { fmt = compact, height = 220, minN = 3, width = 560 } = {}){
+  const W = width, H = height, L = 44, R = 8, T = 18, B = 34;
+  const vals = items.filter(d => d.n >= minN && d.value != null).map(d => d.value);
+  const max = niceMax(Math.max(0, ...vals));
+  const band = (W - L - R) / items.length, bw = Math.min(24, band * 0.6), lblSize = band < 40 ? 9.5 : 11;
+  const y = v => T + (H - T - B) * (1 - v / max);
+  const ticks = [0, max/2, max];
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  for (const t of ticks) s += `<line class="gl" x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end">${fmt(t)}</text>`;
+  items.forEach((d, i) => {
+    const cx = L + band * (i + .5), ok = d.n >= minN && d.value != null;
+    const tipHtml = `<b>${esc(d.label)}</b><br>${ok ? fmt(d.value) + ' · ' : 'too few videos · '}${d.n} video${d.n===1?'':'s'}${d.tip ? '<br>' + d.tip : ''}`;
+    if (ok){ s += `<path class="m" fill="var(--s1)" d="${roundTopBar(cx - bw/2, y(d.value), bw, y(0) - y(d.value), 4)}"/>`;
+      s += `<text class="v" x="${cx}" y="${y(d.value) - 5}" text-anchor="middle">${fmt(d.value)}</text>`; }
+    else s += `<text x="${cx}" y="${y(0) - 5}" text-anchor="middle">n/a</text>`;
+    s += `<text x="${cx}" y="${H - B + 15}" text-anchor="middle" style="font-size:${lblSize}px">${esc(d.label)}</text>`;
+    s += `<text x="${cx}" y="${H - B + 28}" text-anchor="middle" style="font-size:9.5px">n=${d.n}</text>`;
+    s += `<rect class="hit" x="${L + band*i}" y="${T}" width="${band}" height="${H - T - B}" data-tip="${esc(tipHtml)}"/>`;
+  });
+  s += `<line class="base" x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
+  return `<div class="chart">${s}</div>`;
+}
+
+/* diverging horizontal bars around 1× (log scale): items [{label, lift, nWith, nWithout}] */
+function liftBars(items){
+  const rowH = 26, W = 560, L = 190, R = 60, T = 22, H = T + items.length * rowH + 8;
+  const ext = Math.max(Math.log2(2), ...items.map(d => Math.abs(Math.log2(d.lift || 1))));
+  const lim = Math.ceil(ext * 2) / 2;
+  const x = v => L + (W - L - R) * (Math.log2(v) + lim) / (2 * lim), x0 = x(1);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  for (const t of [-lim, 0, lim]) { const v = Math.pow(2, t);
+    s += `<line class="gl" x1="${x(v)}" x2="${x(v)}" y1="${T-6}" y2="${H-4}"/><text x="${x(v)}" y="${T-10}" text-anchor="middle">${xfmt(v)}</text>`; }
+  items.forEach((d, i) => {
+    const yy = T + i * rowH, cy = yy + rowH/2, ok = d.lift != null;
+    s += `<text class="v" x="${L - 10}" y="${cy + 4}" text-anchor="end">${esc(d.label)}</text>`;
+    if (ok){ const xv = x(Math.min(Math.max(d.lift, Math.pow(2,-lim)), Math.pow(2,lim))), up = d.lift >= 1;
+      const bx = Math.min(x0, xv), bw = Math.max(Math.abs(xv - x0), 1), r = Math.min(4, bw/2);
+      const p = up ? `M${bx},${cy-7}H${bx+bw-r}Q${bx+bw},${cy-7} ${bx+bw},${cy-7+r}V${cy+7-r}Q${bx+bw},${cy+7} ${bx+bw-r},${cy+7}H${bx}Z`
+                   : `M${bx+bw},${cy-7}H${bx+r}Q${bx},${cy-7} ${bx},${cy-7+r}V${cy+7-r}Q${bx},${cy+7} ${bx+r},${cy+7}H${bx+bw}Z`;
+      s += `<path class="m" fill="${up ? 'var(--s1)' : 'var(--s2)'}" d="${p}"/>`;
+      s += `<text x="${up ? xv + 6 : xv - 6}" y="${cy + 4}" text-anchor="${up ? 'start' : 'end'}">${xfmt(d.lift)}</text>`; }
+    else s += `<text x="${x0 + 6}" y="${cy + 4}">too few</text>`;
+    const tipHtml = `<b>${esc(d.label)}</b><br>${ok ? `videos with it do ${xfmt(d.lift)} the ${esc(d.unit)} of videos without` : 'not enough videos on both sides'}<br>with: ${d.nWith} · without: ${d.nWithout}`;
+    s += `<rect class="hit" x="0" y="${yy}" width="${W}" height="${rowH}" data-tip="${esc(tipHtml)}"/>`;
+  });
+  s += `<line class="base" x1="${x0}" x2="${x0}" y1="${T-6}" y2="${H-4}"/></svg>`;
+  return `<div class="chart">${s}</div>`;
+}
+
+/* scatter: points [{x, y, s (0|1), tip}] both axes log */
+function scatter(points, { xLabel, yLabel, xTicks, yFmt = compact, xFmt = String }){
+  const W = 560, H = 300, L = 48, R = 12, T = 12, B = 38;
+  if (!points.length) return '<div class="note">no data</div>';
+  const xs = points.map(p => p.x), ys = points.map(p => Math.max(p.y, 1));
+  const xmin = Math.min(...xs), xmax = Math.max(...xs), ymin = Math.pow(10, Math.floor(Math.log10(Math.min(...ys)))), ymax = Math.pow(10, Math.ceil(Math.log10(Math.max(...ys))));
+  const lx = Math.log10(Math.max(xmin, 1)), hx = Math.log10(Math.max(xmax, 10));
+  const X = v => L + (W - L - R) * (Math.log10(Math.max(v,1)) - lx) / Math.max(hx - lx, .01);
+  const Y = v => T + (H - T - B) * (1 - (Math.log10(Math.max(v,1)) - Math.log10(ymin)) / Math.max(Math.log10(ymax) - Math.log10(ymin), .01));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  for (let e = Math.log10(ymin); e <= Math.log10(ymax); e++) { const v = Math.pow(10, e); s += `<line class="gl" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${yFmt(v)}</text>`; }
+  for (const t of xTicks.filter(t => t >= xmin*0.8 && t <= xmax*1.2)) s += `<line class="gl" x1="${X(t)}" x2="${X(t)}" y1="${T}" y2="${H-B}"/><text x="${X(t)}" y="${H-B+15}" text-anchor="middle">${xFmt(t)}</text>`;
+  s += `<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">${esc(xLabel)}</text>`;
+  s += `<text x="12" y="${(T+H-B)/2}" text-anchor="middle" transform="rotate(-90 12 ${(T+H-B)/2})">${esc(yLabel)}</text>`;
+  for (const p of [...points].sort((a,b)=>a.s-b.s)) s += `<g class="pt" data-tip="${esc(p.tip)}"><circle cx="${X(p.x)}" cy="${Y(p.y)}" r="9" fill="transparent"/><circle class="m" cx="${X(p.x)}" cy="${Y(p.y)}" r="4" fill="${p.s ? 'var(--s2)' : 'var(--s1)'}" stroke="var(--card)" stroke-width="2"/></g>`;
+  s += `<line class="base" x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}"/></svg>`;
+  return `<div class="legend"><span><i style="background:var(--s1)"></i>indie (&lt;100K)</span><span><i style="background:var(--s2)"></i>100K+ channels</span></div><div class="chart">${s}</div>`;
+}
+
+/* ---------- analysis ---------- */
+const TECH = /\b(USB|LED|LEDS|PCB|PCBS|CNC|GPU|CPU|AI|DIY|ESP32|LCD|USA|NASA|FPGA|RC|FPV|TV|PC|3D|RGB|CO2|DC|AC|SpaceX|ASIC|NES|IKEA)\b/g;
+const TITLE_FEATURES = [
+  ['Number in title', t => /\d/.test(t)],
+  ['Money ($ / cents)', t => /\$\s?\d|\d\s?(¢|cents?\b|dollars?\b)/i.test(t)],
+  ['Question mark', t => /\?/.test(t)],
+  ['Exclamation', t => /!/.test(t)],
+  ['ALL-CAPS word', t => /\b[A-Z]{3,}\b/.test(t.replace(TECH, ''))],
+  ['First person (I / my)', t => /\b(I|I'm|I've|I'd|my|me)\b/.test(t)],
+  ['"Built" / "made"', t => /\b(buil[dt]|building|made|making)\b/i.test(t)],
+  ['Superlative', t => /\b(best|worst|most|least|biggest|smallest|fastest|cheapest|world'?s|ultimate|perfect|first)\b/i.test(t)],
+  ['"This" / "these"', t => /\b(this|these)\b/i.test(t)],
+  ['Brackets ( ) [ ]', t => /[\(\[]/.test(t)],
+  ['Colon or pipe', t => /[:|]/.test(t)],
+  ['Emoji', t => /\p{Extended_Pictographic}/u.test(t)],
+  ['Short title (< 40 chars)', t => t.length < 40],
+  ['Long title (> 70 chars)', t => t.length > 70],
+];
+const THUMB = [
+  ['brightness', 'Brightness', 'dark → bright'],
+  ['saturation', 'Saturation', 'muted → vivid'],
+  ['colorfulness', 'Colorfulness', 'few colors → many'],
+  ['contrast', 'Contrast', 'flat → punchy'],
+  ['busyness', 'Busyness (edges)', 'clean → busy'],
+  ['warmth', 'Warm colors', 'cool → warm (reds/oranges)'],
+];
+const LEN_BUCKETS = [[0,300,'<5m'],[300,600,'5–10m'],[600,900,'10–15m'],[900,1200,'15–20m'],[1200,1800,'20–30m'],[1800,3600,'30–60m'],[3600,1e9,'60m+']];
+const TLEN_BUCKETS = [[0,30,'<30'],[30,45,'30–44'],[45,60,'45–59'],[60,75,'60–74'],[75,1e9,'75+']];
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const tz = 'America/Denver';
+const dowOf = iso => DOW.indexOf(new Intl.DateTimeFormat('en-US',{weekday:'short',timeZone:tz}).format(new Date(iso)));
+const hourOf = iso => +new Intl.DateTimeFormat('en-US',{hour:'numeric',hourCycle:'h23',timeZone:tz}).format(new Date(iso));
+
+function lift(vs, pred){
+  const a = vs.filter(pred).map(v=>v.perf).filter(x=>x!=null), b = vs.filter(v=>!pred(v)).map(v=>v.perf).filter(x=>x!=null);
+  return { lift: a.length >= 4 && b.length >= 4 ? median(a) / Math.max(median(b), 1e-6) : null, nWith: a.length, nWithout: b.length, unit: '× normal' };
+}
+function bucketize(vs, key, buckets){
+  return buckets.map(([lo, hi, label]) => { const g = vs.filter(v => { const x = key(v); return x != null && x >= lo && x < hi; }); return { label, n: g.length, value: M().of(g), g }; });
+}
+function quartiles(vs, key){
+  const xs = vs.map(key).filter(x=>x!=null); if (xs.length < 8) return null;
+  const q = [pct(xs,.25), pct(xs,.5), pct(xs,.75)];
+  return [[-1,q[0],'Q1 low'],[q[0],q[1],'Q2'],[q[1],q[2],'Q3'],[q[2],2,'Q4 high']];
+}
+
+/* ---------- render ---------- */
+function filtered(){
+  const cut = (GEN ? new Date(GEN) : new Date()) - state.range * 864e5;
+  return ALL.filter(v => new Date(v.published) >= cut && !v.live && !v.blocked && (state.shorts || !v.short)
+    && (state.aud === 'all' || (state.aud === 'indie' ? v.tier === 'indie' : v.tier !== 'indie')));
+}
+
+function render(){
+  const vs = filtered();
+  if (!vs.length){ $('#body').innerHTML = `<div class="empty">no videos in this window yet — the first daily run fills this in.</div>`; return; }
+  const m = M(), withLen = vs.filter(v => v.duration), withThumb = vs.filter(v => v.thumb);
+  const views = vs.map(v=>v.views), totalViews = views.reduce((a,b)=>a+b,0);
+  const breakouts = vs.filter(v => v.perf >= 3).length;
+  const indieN = vs.filter(v => v.tier === 'indie').length;
+
+  // traits for the "why" chips
+  const featLift = TITLE_FEATURES.map(([label, f]) => ({ label, f, ...lift(vs, v => f(v.title)) }));
+  const thumbQ = Object.fromEntries(THUMB.map(([k]) => [k, quartiles(withThumb, v => v.thumb[k])]));
+  const thumbLift = THUMB.map(([k, label]) => { const q = thumbQ[k]; if (!q) return { k, label, lift: null };
+    return { k, label, ...lift(withThumb, v => v.thumb[k] >= q[3][0]) }; });
+  const lenB = bucketize(withLen, v => v.duration, LEN_BUCKETS);
+  const lenPerf = LEN_BUCKETS.map(([lo,hi,label]) => ({ label, lo, hi, ...lift(withLen, v => v.duration >= lo && v.duration < hi) }));
+  function why(v){
+    const out = [];
+    for (const f of featLift) if (f.lift >= 1.15 && f.f(v.title)) out.push([f.lift, f.label.replace(/ \(.*\)$/,'').toLowerCase()]);
+    if (v.thumb) for (const t of thumbLift) if (t.lift >= 1.15 && thumbQ[t.k] && v.thumb[t.k] >= thumbQ[t.k][3][0]) out.push([t.lift, 'high ' + t.label.replace(/ \(.*\)/,'').toLowerCase() + ' thumbnail']);
+    if (v.duration) for (const b of lenPerf) if (b.lift >= 1.15 && v.duration >= b.lo && v.duration < b.hi) out.push([b.lift, b.label + ' length']);
+    return out.sort((a,b)=>b[0]-a[0]).slice(0,3).map(([l,t]) => `${t} · ${xfmt(l)}`);
+  }
+
+  const topBy = (key) => [...vs].sort((a,b)=>(b[key]??0)-(a[key]??0)).slice(0,10);
+  const row = (v, i) => `<div class="row">
+      <div class="rank">${i+1}</div>
+      <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt=""></a>
+      <div><a class="t" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${esc(v.title)}</a>
+        <div class="c">${esc(v.channel)}${v.tier==='indie' ? `<span class="tag">Indie · ${compact(v.subs)}</span>` : v.subs ? ` · ${compact(v.subs)} subs` : ''}</div>
+        <div class="why">${why(v).map(w=>`<span title="Videos with this trait did this much better than ones without, in this window">${esc(w)}</span>`).join('') || '<span>no standout traits — likely the topic or the channel</span>'}</div></div>
+      <div class="nums"><div><b>${compact(v.views)}</b>views</div><div><b>${xfmt(v.perf)}</b>normal</div><div><b>${mins(v.duration)}</b>length</div></div>
+    </div>`;
+
+  // channels
+  const byCh = {};
+  for (const v of vs) (byCh[v.channelId] ??= { name: v.channel, tier: v.tier, subs: v.subs, vs: [] }).vs.push(v);
+  const chRows = Object.values(byCh).map(c => ({ ...c, n: c.vs.length, total: c.vs.reduce((a,v)=>a+v.views,0),
+    med: median(c.vs.map(v=>v.views)), perf: median(c.vs.map(v=>v.perf).filter(x=>x!=null)), best: [...c.vs].sort((a,b)=>b.views-a.views)[0] }));
+
+  const scatterPts = withLen.map(v => ({ x: v.duration / 60, y: v.views, s: v.tier === 'indie' ? 0 : 1,
+    tip: `<b>${esc(v.title)}</b><br>${esc(v.channel)}<br>${full(v.views)} views · ${mins(v.duration)} · ${xfmt(v.perf)} normal` }));
+
+  const tlen = bucketize(vs, v => v.title.length, TLEN_BUCKETS);
+  const dow = DOW.map((d, i) => { const g = vs.filter(v => dowOf(v.published) === i); return { label: d, n: g.length, value: M().of(g) }; });
+  const hours = [[0,6,'0–5'],[6,9,'6–8'],[9,12,'9–11'],[12,15,'12–14'],[15,18,'15–17'],[18,21,'18–20'],[21,24,'21–23']]
+    .map(([lo,hi,label]) => { const g = vs.filter(v => { const h = hourOf(v.published); return h >= lo && h < hi; }); return { label, n: g.length, value: M().of(g) }; });
+  const cats = Object.entries(vs.reduce((a,v)=>{ if (v.category) (a[v.category] ??= []).push(v); return a; }, {}))
+    .map(([label, g]) => ({ label, n: g.length, value: M().of(g) })).sort((a,b)=>b.n-a.n).slice(0,6);
+
+  const wall = [...withThumb].sort((a,b)=>(b.perf??0)-(a.perf??0)).slice(0,12);
+  const thumbMed = Object.fromEntries(THUMB.map(([k]) => [k, median(withThumb.map(v=>v.thumb[k]))]));
+
+  $('#body').innerHTML = `
+  <div class="tiles">
+    <div class="tile"><div class="l">videos posted</div><div class="v">${full(vs.length)}</div><div class="d">${indieN} from indie channels</div></div>
+    <div class="tile"><div class="l">total views</div><div class="v">${compact(totalViews)}</div><div class="d">across ${Object.keys(byCh).length} channels</div></div>
+    <div class="tile"><div class="l">median views / video</div><div class="v">${compact(median(views))}</div><div class="d">avg ${compact(mean(views))} (skewed by the giants)</div></div>
+    <div class="tile"><div class="l">median length</div><div class="v">${mins(median(withLen.map(v=>v.duration)))}</div><div class="d">${withLen.length} with length data</div></div>
+    <div class="tile"><div class="l">breakouts (≥3× normal)</div><div class="v">${breakouts}</div><div class="d">${vs.length ? Math.round(100*breakouts/vs.length) : 0}% of videos</div></div>
+  </div>
+
+  <section>
+    <h2>What got the views</h2>
+    <p class="lede">Biggest videos by raw views, and the biggest <em>breakouts</em> — videos that beat their own channel's usual pace by the most. The chips list traits each one shares with other overperformers in this window, and how much better videos with that trait did.</p>
+    <div class="seg" id="topby" style="margin-bottom:12px"><button data-v="views" aria-pressed="${topSort==='views'}">most views</button><button data-v="perf" aria-pressed="${topSort==='perf'}">biggest breakouts</button></div>
+    <div class="top">${topBy(topSort).map(row).join('')}</div>
+  </section>
+
+  <section>
+    <h2>Length vs views</h2>
+    <p class="lede">Does length matter? Left: ${esc(m.name)} for each length bucket. Right: every video, with length and views both on log scales.</p>
+    <div class="grid2">
+      <div class="card"><h3>${esc(m.name[0].toUpperCase() + m.name.slice(1))} by video length</h3><div class="sub">buckets with fewer than 3 videos are shown as n/a</div>
+        ${columns(lenB, { fmt: m.fmt })}${tableView(['length','videos',m.name], lenB.map(b=>[b.label,b.n,b.value==null?'—':m.full(b.value)]))}</div>
+      <div class="card"><h3>Every video: length × views</h3><div class="sub">hover a dot for the video</div>
+        ${scatter(scatterPts, { xLabel: 'length (minutes, log)', yLabel: 'views (log)', xTicks: [1,2,5,10,20,30,60,120], xFmt: v => v + 'm' })}
+        ${tableView(['video','minutes','views'], withLen.slice(0,200).map(v=>[v.title, (v.duration/60).toFixed(1), full(v.views)]))}</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Titles</h2>
+    <p class="lede">For each title trait: how videos <em>with</em> it did against videos <em>without</em> it, measured in × channel normal so big channels don't drown out small ones. Blue = trait goes with doing better, orange = worse.</p>
+    <div class="grid2">
+      <div class="card"><h3>Title traits: lift vs titles without them</h3><div class="sub">needs at least 4 videos on each side</div>
+        ${liftBars(featLift)}${tableView(['trait','lift','with','without'], featLift.map(f=>[f.label, f.lift==null?'—':xfmt(f.lift), f.nWith, f.nWithout]))}</div>
+      <div class="card"><h3>${esc(m.name[0].toUpperCase() + m.name.slice(1))} by title length</h3><div class="sub">characters in the title</div>
+        ${columns(tlen, { fmt: m.fmt })}${tableView(['characters','videos',m.name], tlen.map(b=>[b.label,b.n,b.value==null?'—':m.full(b.value)]))}
+        <h3 style="margin-top:14px">Most common words in breakout titles</h3>
+        <div class="why" style="margin:8px 0 10px">${topWords(vs).map(([w,n])=>`<span>${esc(w)} · ${n}</span>`).join('') || '<span>not enough breakouts yet</span>'}</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Thumbnails</h2>
+    <p class="lede">Each thumbnail is measured for brightness, saturation, colorfulness, contrast, busyness (how many edges/details) and how much of it is warm reds and oranges. Videos are split into quarters on each measure, from low (Q1) to high (Q4). Median thumbnail this window: brightness ${pctf(thumbMed.brightness)}, saturation ${pctf(thumbMed.saturation)}, colorfulness ${pctf(thumbMed.colorfulness)}.</p>
+    ${withThumb.length < 8 ? '<div class="note">Thumbnail stats appear once at least 8 videos have been analyzed.</div>' : `
+    <div class="grid3">${THUMB.map(([k,label,range]) => { const q = thumbQ[k]; const b = q ? bucketize(withThumb, v=>v.thumb[k], q) : [];
+      return `<div class="card"><h3>${esc(label)}</h3><div class="sub">${esc(range)} · ${esc(m.name)}</div>${columns(b, { fmt: m.fmt, height: 180, width: 340 })}
+        ${tableView(['quarter','videos',m.name], b.map(x=>[x.label,x.n,x.value==null?'—':m.full(x.value)]))}</div>`; }).join('')}</div>
+    <h3 style="font:500 16px Roboto;margin:26px 0 10px">Thumbnails of this window's biggest breakouts, with their 3 main colors</h3>
+    <div class="wall">${wall.map(v=>`<figure><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="${esc(v.title)}"></a>
+      <div class="sw">${(v.thumb.palette||[]).map(([c,w])=>`<span style="flex:${w};background:${esc(c)}" data-tip="${esc(c)} · ${Math.round(w*100)}%"></span>`).join('')}</div>
+      <figcaption><b>${xfmt(v.perf)}</b> · bright ${pctf(v.thumb.brightness)} · sat ${pctf(v.thumb.saturation)} · busy ${pctf(v.thumb.busyness)}</figcaption></figure>`).join('')}</div>`}
+  </section>
+
+  <section>
+    <h2>When it was posted</h2>
+    <p class="lede">Upload day and time in Mountain time, plus YouTube's own category for each video.</p>
+    <div class="grid3">
+      <div class="card"><h3>By day of week</h3><div class="sub">${esc(m.name)}</div>${columns(dow, { fmt: m.fmt, height: 200, width: 340 })}${tableView(['day','videos',m.name], dow.map(b=>[b.label,b.n,b.value==null?'—':m.full(b.value)]))}</div>
+      <div class="card"><h3>By hour posted (MT)</h3><div class="sub">${esc(m.name)}</div>${columns(hours, { fmt: m.fmt, height: 200, width: 340 })}${tableView(['hours','videos',m.name], hours.map(b=>[b.label,b.n,b.value==null?'—':m.full(b.value)]))}</div>
+      <div class="card"><h3>By YouTube category</h3><div class="sub">${esc(m.name)} · top 6 by count</div>${columns(cats.map(c=>({...c,label:c.label.split(/[ &]/)[0]})), { fmt: m.fmt, height: 200, width: 340 })}${tableView(['category','videos',m.name], cats.map(b=>[b.label,b.n,b.value==null?'—':m.full(b.value)]))}</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Channels</h2>
+    <p class="lede">Everyone who posted in this window. Click a column to sort.</p>
+    <div class="card tablewrap"><table id="chtable"><thead><tr>
+      <th data-k="name">channel</th><th class="n" data-k="subs">subs</th><th class="n" data-k="n">videos</th><th class="n" data-k="total">total views</th>
+      <th class="n" data-k="med">median views</th><th class="n" data-k="perf">median × normal</th><th data-k="best">best video</th></tr></thead><tbody></tbody></table></div>
+  </section>`;
+
+  document.querySelectorAll('#topby button').forEach(b => b.onclick = () => { topSort = b.dataset.v; render(); });
+  drawChannels(chRows);
+}
+
+let topSort = 'views', chSort = ['total', -1];
+function drawChannels(rows){
+  const [k, dir] = chSort;
+  rows.sort((a,b) => { const x = k === 'best' ? a.best.views : a[k], y = k === 'best' ? b.best.views : b[k];
+    return (typeof x === 'string' ? x.localeCompare(y) : (x??-1) - (y??-1)) * dir; });
+  $('#chtable tbody').innerHTML = rows.map(c => `<tr><td>${esc(c.name)}${c.tier==='indie'?'<span class="tag">Indie</span>':''}</td>
+    <td class="n">${compact(c.subs)}</td><td class="n">${c.n}</td><td class="n">${compact(c.total)}</td><td class="n">${compact(c.med)}</td><td class="n">${xfmt(c.perf)}</td>
+    <td><a href="https://www.youtube.com/watch?v=${esc(c.best.id)}" target="_blank" rel="noopener" style="color:inherit">${esc(c.best.title.slice(0,60))}${c.best.title.length>60?'…':''}</a></td></tr>`).join('');
+  document.querySelectorAll('#chtable th').forEach(th => th.onclick = () => {
+    chSort = [th.dataset.k, chSort[0] === th.dataset.k ? -chSort[1] : (th.dataset.k === 'name' ? 1 : -1)]; drawChannels(rows); });
+}
+
+const STOP = new Set('the a an and or of to in on for with my i is it this that how from vs at by your you we our can its it\'s i\'m are was be what why new de la'.split(' '));
+function topWords(vs){
+  const br = vs.filter(v => v.perf >= 2); if (br.length < 3) return [];
+  const c = {}; for (const v of br) for (const w of new Set(v.title.toLowerCase().replace(/[^\p{L}\p{N}$' ]/gu,' ').split(/\s+/))) if (w.length > 2 && !STOP.has(w)) c[w] = (c[w]||0) + 1;
+  return Object.entries(c).filter(([,n]) => n >= 2).sort((a,b)=>b[1]-a[1]).slice(0,14);
+}
+const pctf = x => x == null ? '—' : Math.round(x * 100) + '%';
+
+/* ---------- controls ---------- */
+for (const [id, key, cast] of [['range','range',Number],['aud','aud',String],['metric','metric',String]])
+  document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => {
+    state[key] = cast(b.dataset.v);
+    document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
+$('#shorts').onchange = e => { state.shorts = e.target.checked; render(); };
+
+fetch('videos.json?t=' + Date.now()).then(r => r.json()).then(d => {
+  ALL = d.videos; GEN = d.generated;
+  $('#gen').textContent = 'Updated ' + new Date(GEN).toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  render();
+}).catch(() => { $('#body').innerHTML = `<div class="empty">no stats yet — run the daily workflow once to create videos.json.</div>`; });
+</script>
+</body>
+</html>
