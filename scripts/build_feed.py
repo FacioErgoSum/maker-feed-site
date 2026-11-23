@@ -12,7 +12,7 @@ Works with zero keys (channel RSS + public pages). Optional:
   ANTHROPIC_API_KEY  -> a Claude "vibe check" that drops anything doomer-ish the keywords missed
 Pillow (pip install pillow) enables thumbnail analysis; without it that step is skipped.
 """
-import io, json, math, os, re, sys, statistics, datetime as dt
+import io, json, math, os, random, re, sys, statistics, threading, time, datetime as dt
 import urllib.request, urllib.parse, urllib.error
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -37,6 +37,8 @@ SUBS_MAX_AGE_DAYS = 7      # re-check subscriber counts weekly
 HISTORY_DAYS = 30          # days of archive + stats
 STORE_DAYS = 40            # keep a little extra in the working store
 SHORT_MAX_SECONDS = 180    # anything longer can't be a Short
+MAX_ENRICH_PER_RUN = 250   # new videos looked up per run (the backlog drains over a few days)
+ENRICH_WORKERS = 3         # parallel page fetches; YouTube rate-limits bursts
 
 # Anything matching these is dropped (except 'always' channels).
 BLOCK = [
@@ -57,11 +59,36 @@ NS = {"a": "http://www.w3.org/2005/Atom",
       "media": "http://search.yahoo.com/mrss/"}
 
 
-def get(url, data=None, headers=None, timeout=20, raw=False):
-    req = urllib.request.Request(url, data=data, headers={**UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        body = r.read()
-        return body if raw else body.decode("utf-8", "replace")
+class RateLimited(Exception):
+    pass
+
+_throttle = {"hits": 0, "until": 0.0}
+_tlock = threading.Lock()
+GIVE_UP_AFTER = 12         # 429s in one run before we stop hammering and try again tomorrow
+
+
+def get(url, data=None, headers=None, timeout=20, raw=False, retries=3):
+    """Polite fetch: on 429/503 every worker pauses together, backs off, then retries."""
+    for attempt in range(retries + 1):
+        with _tlock:
+            if _throttle["hits"] >= GIVE_UP_AFTER and "youtube.com" in url:
+                raise RateLimited("YouTube is rate-limiting this run")
+            wait = _throttle["until"] - time.time()
+        if wait > 0:
+            time.sleep(wait)
+        req = urllib.request.Request(url, data=data, headers={**UA, **(headers or {})})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                body = r.read()
+                return body if raw else body.decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 503) or attempt == retries:
+                raise
+            ra = e.headers.get("Retry-After") if e.headers else None
+            pause = min(float(ra), 90) if ra and ra.isdigit() else 5 * 3 ** attempt + random.uniform(0, 3)
+            with _tlock:
+                _throttle["hits"] += 1
+                _throttle["until"] = max(_throttle["until"], time.time() + pause)
 
 
 def load(path, default):
@@ -102,6 +129,8 @@ def fetch_subs(cid):
     """Subscriber count + avatar URL from the channel page."""
     try:
         html = get(f"https://www.youtube.com/channel/{cid}")
+    except RateLimited:
+        return None
     except Exception as e:
         print(f"  ! channel page failed {cid}: {e}", file=sys.stderr)
         return None
@@ -119,7 +148,7 @@ def refresh_subs(cids, today):
              (today - dt.date.fromisoformat(cache[c]["checked"])).days >= SUBS_MAX_AGE_DAYS]
     if stale:
         print(f"Checking subscriber counts for {len(stale)} channels…")
-        with ThreadPoolExecutor(8) as ex:
+        with ThreadPoolExecutor(ENRICH_WORKERS) as ex:
             for c, info in zip(stale, ex.map(fetch_subs, stale)):
                 if info:                   # keep the old numbers if YouTube didn't answer
                     cache[c] = {**info, "checked": today.isoformat()}
@@ -175,8 +204,11 @@ def is_short(vid):
 
 def watch_details(vid):
     """Length, category, tags, likes and live flag from the public watch page."""
+    time.sleep(random.uniform(0.3, 0.8))   # spread requests out
     try:
         html = get(f"https://www.youtube.com/watch?v={vid}")
+    except RateLimited:
+        return {}
     except Exception as e:
         print(f"  ! watch page failed {vid}: {e}", file=sys.stderr)
         return {}
@@ -195,6 +227,41 @@ def watch_details(vid):
     out["live"] = '"isLiveContent":true' in html
     if "duration" in out:
         out["short"] = out["duration"] <= SHORT_MAX_SECONDS and is_short(vid)
+    return out
+
+
+YT_CATEGORIES = {"1": "Film & Animation", "2": "Autos & Vehicles", "10": "Music", "15": "Pets & Animals", "17": "Sports",
+                 "19": "Travel & Events", "20": "Gaming", "22": "People & Blogs", "23": "Comedy", "24": "Entertainment",
+                 "25": "News & Politics", "26": "Howto & Style", "27": "Education", "28": "Science & Technology"}
+
+
+def iso_duration(s):
+    m = re.fullmatch(r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", s or "")
+    if not m:
+        return None
+    d, h, mi, se = (int(x or 0) for x in m.groups())
+    return d * 86400 + h * 3600 + mi * 60 + se
+
+
+def api_details(vids, key):
+    """Same fields as watch_details, via the YouTube Data API (1 quota unit per 50 videos)."""
+    out = {}
+    for i in range(0, len(vids), 50):
+        p = urllib.parse.urlencode({"part": "contentDetails,snippet,statistics,liveStreamingDetails",
+                                    "id": ",".join(vids[i:i + 50]), "key": key})
+        try:
+            items = json.loads(get("https://www.googleapis.com/youtube/v3/videos?" + p))["items"]
+        except Exception as e:
+            print(f"  ! API details failed: {e}", file=sys.stderr)
+            continue
+        for it in items:
+            d = {"duration": iso_duration(it["contentDetails"].get("duration")),
+                 "category": YT_CATEGORIES.get(it["snippet"].get("categoryId"), "Other"),
+                 "tags": it["snippet"].get("tags", [])[:12],
+                 "live": "liveStreamingDetails" in it}
+            if "likeCount" in it.get("statistics", {}):
+                d["likes"] = int(it["statistics"]["likeCount"])
+            out[it["id"]] = d
     return out
 
 
@@ -418,20 +485,39 @@ def main():
         hist = s.setdefault("history", [])
         if not hist or hist[-1][0] != today.isoformat():
             hist.append([today.isoformat(), v["views"]])
-    for vid in [k for k, s in store.items() if parse_time(s["published"]) < cutoff]:
+    # drop anything too old, and anything from a channel you've removed from channels.json
+    for vid in [k for k, s in store.items()
+                if parse_time(s["published"]) < cutoff or (s.get("source") != "discover" and s.get("channelId") not in tier_of)]:
         del store[vid]
 
-    todo = [vid for vid, s in store.items() if "duration" not in s]
-    if todo:
-        print(f"Enriching {len(todo)} new videos (length, tags, Shorts)…")
-        with ThreadPoolExecutor(8) as ex:
-            for vid, d in zip(todo, ex.map(watch_details, todo)):
+    # newest first, so today's feed candidates get their length/Shorts check before the backlog
+    todo = sorted((vid for vid, s in store.items() if "duration" not in s),
+                  key=lambda vid: store[vid]["published"], reverse=True)
+    if todo and os.environ.get("YOUTUBE_API_KEY"):
+        print(f"Looking up {len(todo)} new videos via the YouTube API…")
+        found = api_details(todo, os.environ["YOUTUBE_API_KEY"])
+        maybe_short = [vid for vid, d in found.items() if d.get("duration") and d["duration"] <= SHORT_MAX_SECONDS]
+        with ThreadPoolExecutor(ENRICH_WORKERS) as ex:
+            shorts = dict(zip(maybe_short, ex.map(is_short, maybe_short)))
+        for vid, d in found.items():
+            d["short"] = shorts.get(vid, False)
+            store[vid].update(d)
+    elif todo:
+        batch = todo[:MAX_ENRICH_PER_RUN]
+        print(f"Enriching {len(batch)} of {len(todo)} new videos (length, tags, Shorts)…")
+        with ThreadPoolExecutor(ENRICH_WORKERS) as ex:
+            for vid, d in zip(batch, ex.map(watch_details, batch)):
                 store[vid].update(d)
+        left = sum(1 for s in store.values() if "duration" not in s)
+        if _throttle["hits"]:
+            print(f"  YouTube asked us to slow down {_throttle['hits']} times; {left} videos will be looked up on later runs.")
+        elif left:
+            print(f"  {left} videos left for later runs.")
     if Image is not None:
         todo = [vid for vid, s in store.items() if "thumb" not in s and not s.get("short")]
         if todo:
             print(f"Analyzing {len(todo)} thumbnails…")
-            with ThreadPoolExecutor(8) as ex:
+            with ThreadPoolExecutor(6) as ex:   # thumbnails come from the image CDN, which is far less strict
                 for vid, t in zip(todo, ex.map(thumb_stats, todo)):
                     if t:
                         store[vid]["thumb"] = t
