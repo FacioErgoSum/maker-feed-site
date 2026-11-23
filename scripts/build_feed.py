@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
 CACHE = os.path.join(ROOT, "data", "channel_ids.json")
+SUBS = os.path.join(ROOT, "data", "subs.json")
 UA = {"User-Agent": "Mozilla/5.0 (maker-feed; +https://github.com)",
       "Accept-Language": "en-US,en;q=0.9"}
 
@@ -21,7 +22,9 @@ PER_CHANNEL = 2
 WINDOW_HOURS = 48          # "of the day" with some slack for timezones/slow uploaders
 FALLBACK_HOURS = 24 * 7    # widen if the day was quiet
 MIN_VIDEOS = 12
-INDIE_SHARE = 0.5         # at least this fraction of the feed comes from the indie list
+INDIE_SHARE = 0.5         # at least this fraction of the feed comes from indie channels
+INDIE_MAX_SUBS = 100_000  # under this many subscribers = indie
+SUBS_MAX_AGE_DAYS = 7     # re-check subscriber counts weekly
 
 # Anything matching these is dropped (except 'always' channels).
 BLOCK = [
@@ -63,6 +66,38 @@ def resolve(handle, cache):
     except Exception as e:
         print(f"  ! couldn't resolve {handle}: {e}", file=sys.stderr)
     return None
+
+
+# ---------- subscriber counts (decide who's indie) ----------
+def _num(s):
+    s = s.replace(",", "")
+    mult = 1_000_000 if s.endswith("M") else 1_000 if s.endswith("K") else 1
+    return int(float(s.rstrip("KM")) * mult)
+
+
+def fetch_subs(cid):
+    try:
+        html = get(f"https://www.youtube.com/channel/{cid}")
+        m = (re.search(r'"content":"([\d.,]+[KM]?) subscribers"', html)
+             or re.search(r'"([\d.,]+[KM]?) subscribers"', html))
+        return _num(m.group(1)) if m else None
+    except Exception as e:
+        print(f"  ! subs failed {cid}: {e}", file=sys.stderr)
+        return None
+
+
+def refresh_subs(cids, today):
+    cache = json.load(open(SUBS)) if os.path.exists(SUBS) else {}
+    stale = [c for c in cids if c not in cache or
+             (today - dt.date.fromisoformat(cache[c]["checked"])).days >= SUBS_MAX_AGE_DAYS]
+    if stale:
+        print(f"Checking subscriber counts for {len(stale)} channels…")
+        with ThreadPoolExecutor(8) as ex:
+            for c, n in zip(stale, ex.map(fetch_subs, stale)):
+                if n is not None:          # keep the old number if YouTube didn't answer
+                    cache[c] = {"subs": n, "checked": today.isoformat()}
+        json.dump(cache, open(SUBS, "w"), indent=0, sort_keys=True)
+    return {c: v["subs"] for c, v in cache.items()}
 
 
 # ---------- RSS ----------
@@ -227,7 +262,9 @@ def main():
     cache = json.load(open(CACHE)) if os.path.exists(CACHE) else {}
 
     print("Resolving channels…")
-    entries = [(e, tier) for tier in ("always", "indie", "makers") for e in cfg.get(tier, [])]
+    # "indie"/"makers" are accepted for older configs; tiers are now decided by subscriber count
+    entries = [(e, "always" if key == "always" else "channel")
+               for key in ("always", "channels", "indie", "makers") for e in cfg.get(key, [])]
 
     def to_id(e):
         if isinstance(e, list):
@@ -244,6 +281,11 @@ def main():
     for cid, tier in ids:
         if cid:
             tier_of.setdefault(cid, tier)
+    subs = refresh_subs(list(tier_of), now.date())
+    for c, t in tier_of.items():
+        if t == "channel":
+            tier_of[c] = "indie" if subs.get(c, INDIE_MAX_SUBS) < INDIE_MAX_SUBS else "maker"
+    print(f"  {sum(t == 'indie' for t in tier_of.values())} indie channels (< {INDIE_MAX_SUBS:,} subs)")
     always_ids = {c for c, t in tier_of.items() if t == "always"}
     ids = list(tier_of.items())
 
@@ -266,6 +308,7 @@ def main():
         seen.add(v["id"])
         v["always"] = v["channelId"] in always_ids
         v["tier"] = tier_of.get(v["channelId"], "discover")
+        v["subs"] = subs.get(v["channelId"])
         if not v["always"] and BLOCK_RE.search(v["title"]):
             continue
         clean.append(v)

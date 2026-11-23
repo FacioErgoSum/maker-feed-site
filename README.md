@@ -13,7 +13,8 @@ A self-built YouTube homepage: the best maker videos of the day, no doom, no mar
 - `ANTHROPIC_API_KEY`: Claude reads every title and drops anything gloomy the keyword filter missed, then writes a short blurb for each card.
 
 ## Tune it
-- `indie` channels are guaranteed at least half the feed (`INDIE_SHARE`), and every video is scored against its own channel's usual views, so a small maker's breakout beats a big channel's average upload.
-- `channels.json`: `always` channels skip the filter. Entries are `["Name", "UC…channelId"]` or an `@handle`. `search_queries` drives discovery.
+- Any channel under 100K subscribers (`INDIE_MAX_SUBS`) is tagged indie automatically and indie channels get at least half the feed (`INDIE_SHARE`). Subscriber counts are cached in `data/subs.json` and re-checked weekly, so a channel that grows past 100K graduates on its own.
+- Every video is scored against its own channel's usual views, so a small maker's breakout beats a big channel's average upload.
+- `channels.json`: `always` channels skip the filter; everything else goes in `channels`. Entries are `["Name", "UC…channelId"]` or an `@handle`. `search_queries` drives discovery.
 - `scripts/build_feed.py`: the `BLOCK` keyword list, how many videos to show, and the time window.
 - The page remembers which videos you've watched (per browser), and there's a "hide watched" toggle.

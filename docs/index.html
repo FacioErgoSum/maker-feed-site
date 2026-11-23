@@ -105,7 +105,7 @@ function card(v){
       <div class="play"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M6 4l15 8-15 8z"/></svg></span></div>
     </div>
     <div class="meta">
-      <div class="chan">${esc(v.channel)}${v.always ? '<span class="tag">always on</span>' : ''}${v.tier==='indie' ? '<span class="tag" style="background:#6b4fd8">indie</span>' : ''}${v.source==='discover' ? '<span class="tag" style="background:var(--mask)">new find</span>' : ''}</div>
+      <div class="chan">${esc(v.channel)}${v.always ? '<span class="tag">always on</span>' : ''}${v.tier==='indie' ? `<span class="tag" style="background:#6b4fd8" title="under 100K subscribers">indie${v.subs ? ' · ' + fmt(v.subs) : ''}</span>` : ''}${v.source==='discover' ? '<span class="tag" style="background:var(--mask)">new find</span>' : ''}</div>
       <h2 class="title">${esc(v.title)}</h2>
       ${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}
       <div class="foot"><span>${ago(v.published)}${v.views ? ' · ' + fmt(v.views) + ' views' : ''}</span>
