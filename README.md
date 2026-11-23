@@ -1,7 +1,7 @@
 # The Bench
 
 A self-built YouTube homepage: the best maker videos of the day, no doom, no markets, no news
-(except Fireship and AI Explained). Rebuilt every morning by GitHub Actions, served by GitHub Pages.
+(except Fireship). Rebuilt every morning by GitHub Actions, served by GitHub Pages.
 
 ## Set up (5 minutes)
 1. Push this folder to a new GitHub repo.

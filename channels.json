@@ -1,13 +1,9 @@
 {
- "_comment": "Entries are [name, channelId] or an '@handle'. 'always' skips the doom/news filter. Channels under INDIE_MAX_SUBS (100K) are tagged indie automatically and get at least half the feed. Open Sauce 2026 maker/science/DIY creators added 2026-11-22.",
+ "_comment": "Entries are [name, channelId] or an '@handle'. 'always' (Fireship) skips the doom/news filter. Channels under INDIE_MAX_SUBS (100K) are tagged indie automatically and get at least half the feed. Open Sauce 2026 maker/science/DIY creators added 2026-11-22.",
  "always": [
   [
    "Fireship",
    "UCsBjURrPoezykLs9EqgamOA"
-  ],
-  [
-   "AI Explained",
-   "UCNJ1Ymd5yFuUPtn21xtRbbw"
   ]
  ],
  "channels": [

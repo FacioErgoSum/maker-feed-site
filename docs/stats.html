@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats · The Bench</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff0033'/%3E%3Cpath d='M4 11h24v4H4zM7 15h3v11H7zm15 0h3v11h-3zM7 20h18v2.5H7z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect y='5' width='32' height='22' rx='6' fill='%23ff0033'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='%23fff'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -21,9 +21,8 @@
   a{color:inherit}
   .mast{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--paper)}
   .logo{display:flex;align-items:center;gap:4px;font:700 19px/1 Roboto,sans-serif;letter-spacing:-.6px;text-decoration:none}
-  .logo .mark{width:26px;height:26px;border-radius:7px;background:var(--red);display:grid;place-items:center;margin-right:3px}
+  .logo .mark{width:30px;height:21px;border-radius:6px;background:var(--red);display:grid;place-items:center;margin-right:3px}
   .logo .word{display:flex}
-  .logo sup{font:400 10px Roboto;color:var(--muted);letter-spacing:0;margin-left:2px;align-self:flex-start;margin-top:-2px}
   .mast nav{display:flex;gap:8px;align-items:center}
   .mast nav a{height:36px;padding:0 14px;border-radius:18px;display:flex;align-items:center;text-decoration:none;font:500 14px Roboto}
   .mast nav a:hover{background:var(--hover)}
@@ -88,6 +87,7 @@
   .nums b{display:block;font:500 17px Roboto,sans-serif;color:var(--ink)}
   .why{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
   .why span{font:12px Roboto;background:var(--chip);border-radius:6px;padding:2px 8px;color:var(--muted)}
+  .av{width:20px;height:20px;border-radius:50%;vertical-align:-5px;margin-right:6px;object-fit:cover}
   .tag{border-radius:4px;padding:0 4px;font:500 12px Roboto;margin-left:6px;background:var(--chip);color:var(--muted)}
 
   .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
@@ -105,7 +105,7 @@
 </head>
 <body>
 <header class="mast">
-  <a class="logo" href="./"><span class="mark"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 5h14v2.5H1zM3 7.5h2V14H3zm8 0h2V14h-2zM3 10.5h10V12H3z" fill="#fff"/></svg></span><span class="word">TheBench<sup>CO</sup></span></a>
+  <a class="logo" href="./"><span class="mark"><svg width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="1.5" fill="#fff"/></svg></span><span class="word">TheBench</span></a>
   <nav><a href="./">Home</a><a href="stats.html" aria-current="page">Stats</a><span id="gen"></span></nav>
 </header>
 <div class="wrap">
@@ -138,7 +138,7 @@ const mean = a => a.length ? a.reduce((s,x)=>s+x,0)/a.length : null;
 const pct = (a, q) => { const b = [...a].sort((x,y)=>x-y); return b[Math.min(b.length-1, Math.floor(q*b.length))]; };
 
 const state = { range: 7, aud: 'all', metric: 'median', shorts: false };
-let ALL = [], GEN = null;
+let ALL = [], GEN = null, AV = {};
 
 /* ---------- tooltip ---------- */
 const tip = $('#tip');
@@ -319,7 +319,7 @@ function render(){
       <div class="rank">${i+1}</div>
       <a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener"><img loading="lazy" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt=""></a>
       <div><a class="t" href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener">${esc(v.title)}</a>
-        <div class="c">${esc(v.channel)}${v.tier==='indie' ? `<span class="tag">Indie · ${compact(v.subs)}</span>` : v.subs ? ` · ${compact(v.subs)} subs` : ''}</div>
+        <div class="c">${av(v)}${esc(v.channel)}${v.tier==='indie' ? `<span class="tag">Indie · ${compact(v.subs)}</span>` : v.subs ? ` · ${compact(v.subs)} subs` : ''}</div>
         <div class="why">${why(v).map(w=>`<span title="Videos with this trait did this much better than ones without, in this window">${esc(w)}</span>`).join('') || '<span>no standout traits — likely the topic or the channel</span>'}</div></div>
       <div class="nums"><div><b>${compact(v.views)}</b>views</div><div><b>${xfmt(v.perf)}</b>normal</div><div><b>${mins(v.duration)}</b>length</div></div>
     </div>`;
@@ -424,7 +424,7 @@ function drawChannels(rows){
   const [k, dir] = chSort;
   rows.sort((a,b) => { const x = k === 'best' ? a.best.views : a[k], y = k === 'best' ? b.best.views : b[k];
     return (typeof x === 'string' ? x.localeCompare(y) : (x??-1) - (y??-1)) * dir; });
-  $('#chtable tbody').innerHTML = rows.map(c => `<tr><td>${esc(c.name)}${c.tier==='indie'?'<span class="tag">Indie</span>':''}</td>
+  $('#chtable tbody').innerHTML = rows.map(c => `<tr><td>${av({ channelId: c.best.channelId, avatar: c.best.avatar, channel: c.name })}${esc(c.name)}${c.tier==='indie'?'<span class="tag">Indie</span>':''}</td>
     <td class="n">${compact(c.subs)}</td><td class="n">${c.n}</td><td class="n">${compact(c.total)}</td><td class="n">${compact(c.med)}</td><td class="n">${xfmt(c.perf)}</td>
     <td><a href="https://www.youtube.com/watch?v=${esc(c.best.id)}" target="_blank" rel="noopener" style="color:inherit">${esc(c.best.title.slice(0,60))}${c.best.title.length>60?'…':''}</a></td></tr>`).join('');
   document.querySelectorAll('#chtable th').forEach(th => th.onclick = () => {
@@ -437,6 +437,8 @@ function topWords(vs){
   const c = {}; for (const v of br) for (const w of new Set(v.title.toLowerCase().replace(/[^\p{L}\p{N}$' ]/gu,' ').split(/\s+/))) if (w.length > 2 && !STOP.has(w)) c[w] = (c[w]||0) + 1;
   return Object.entries(c).filter(([,n]) => n >= 2).sort((a,b)=>b[1]-a[1]).slice(0,14);
 }
+const av = v => { const u = v.avatar || AV[v.channelId];
+  return u ? `<img class="av" src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''; };
 const pctf = x => x == null ? '—' : Math.round(x * 100) + '%';
 
 /* ---------- controls ---------- */
@@ -446,6 +448,7 @@ for (const [id, key, cast] of [['range','range',Number],['aud','aud',String],['m
     document.querySelectorAll(`#${id} button`).forEach(x => x.setAttribute('aria-pressed', x === b)); render(); });
 $('#shorts').onchange = e => { state.shorts = e.target.checked; render(); };
 
+fetch('avatars.json?t=' + Date.now()).then(r => r.json()).then(a => { AV = a; if (ALL.length) render(); }).catch(() => {});
 fetch('videos.json?t=' + Date.now()).then(r => r.json()).then(d => {
   ALL = d.videos; GEN = d.generated;
   $('#gen').textContent = 'Updated ' + new Date(GEN).toLocaleString(undefined, { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });

@@ -6,7 +6,7 @@
 <title>The Bench</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ff0033'/%3E%3Cpath d='M4 11h24v4H4zM7 15h3v11H7zm15 0h3v11h-3zM7 20h18v2.5H7z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect y='5' width='32' height='22' rx='6' fill='%23ff0033'/%3E%3Crect x='11' y='11' width='10' height='10' rx='1.5' fill='%23fff'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#ffffff; --raised:#ffffff; --text:#0f0f0f; --text2:#606060; --chip:#f2f2f2; --chip-hover:#e5e5e5;
@@ -31,9 +31,8 @@
   .iconbtn{width:40px;height:40px;border-radius:50%;border:0;background:none;display:grid;place-items:center;cursor:pointer}
   .iconbtn:hover{background:var(--hover)}
   .logo{display:flex;align-items:center;gap:4px;font:700 19px/1 Roboto,sans-serif;letter-spacing:-.6px}
-  .logo .mark{width:26px;height:26px;border-radius:7px;background:var(--red);display:grid;place-items:center;margin-right:3px}
+  .logo .mark{width:30px;height:21px;border-radius:6px;background:var(--red);display:grid;place-items:center;margin-right:3px}
   .logo .word{display:flex}
-  .logo sup{font:400 10px Roboto;color:var(--text2);letter-spacing:0;margin-left:2px;align-self:flex-start;margin-top:-2px}
   .search{flex:0 1 732px;display:flex;align-items:center;margin:0 40px}
   .search input{flex:1;height:40px;border:1px solid var(--search-line);border-right:0;border-radius:40px 0 0 40px;
     background:var(--search-bg);color:var(--text);font:16px Roboto,sans-serif;padding:0 16px;outline:none;min-width:0}
@@ -88,7 +87,6 @@
   .meta{color:var(--text2);font-size:14px;line-height:20px}
   .meta a:hover{color:var(--text)}
   .badge{display:inline-block;font:500 12px Roboto;background:var(--chip);color:var(--text2);border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px}
-  .badge.always{color:var(--text)}
   .dot::before{content:"•";margin:0 4px}
   .empty{padding:80px 0;text-align:center;color:var(--text2);font-size:16px}
 
@@ -104,7 +102,7 @@
   <div class="l">
     <button class="iconbtn" id="menu" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24"><path d="M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z"/></svg></button>
     <a class="logo" href="./" title="The Bench home">
-      <span class="mark"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 5h14v2.5H1zM3 7.5h2V14H3zm8 0h2V14h-2zM3 10.5h10V12H3z" fill="#fff"/></svg></span><span class="word">TheBench<sup>CO</sup></span>
+      <span class="mark"><svg width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="1.5" fill="#fff"/></svg></span><span class="word">TheBench</span>
     </a>
   </div>
   <form class="search" role="search" onsubmit="return false">
@@ -126,7 +124,7 @@
     <div class="full">
       <hr><h4>Recent days</h4><div id="days"></div>
       <hr><h4>Channels here</h4><div id="chans"></div>
-      <hr><div class="foot">Half indie makers · no doom, no markets, no news (except Fireship &amp; AI Explained) · refreshed every morning</div>
+      <hr><div class="foot">Half indie makers · no doom, no markets, no news (except Fireship) · refreshed every morning</div>
     </div>
   </nav>
 
@@ -135,7 +133,6 @@
       <button class="chip" data-f="all" aria-pressed="true">All</button>
       <button class="chip" data-f="indie">Indie makers</button>
       <button class="chip" data-f="big">Big channels</button>
-      <button class="chip" data-f="always">Fireship &amp; AI Explained</button>
       <button class="chip" data-f="short">Under 10 minutes</button>
       <button class="chip" data-f="long">20 minutes+</button>
       <button class="chip" data-f="unwatched">Not watched</button>
@@ -152,7 +149,7 @@ const store = {
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)) } catch {} }
 };
 let watched = new Set(store.get('watched', []));
-let feed = null, filter = 'all', query = '', chanFilter = null, currentDay = '';
+let feed = null, filter = 'all', query = '', chanFilter = null, currentDay = '', AV = {};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const views = n => n >= 1e9 ? (n/1e9).toFixed(1).replace(/\.0$/,'') + 'B views' : n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/,'') + 'M views'
@@ -164,8 +161,8 @@ const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000;
   return 'just now'; };
 const dur = s => !s ? '' : s < 3600 ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` : `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 const hue = str => [...String(str)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
-const avatar = (v, cls = 'avatar') => v.avatar
-  ? `<img class="${cls}" src="${esc(v.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+const avatar = (v, cls = 'avatar') => (v.avatar || AV[v.channelId])
+  ? `<img class="${cls}" src="${esc(v.avatar || AV[v.channelId])}" alt="" loading="lazy" referrerpolicy="no-referrer">`
   : `<span class="${cls}" style="background:hsl(${hue(v.channelId)} 45% 45%)">${esc((v.channel || '?').trim()[0].toUpperCase())}</span>`;
 
 function visible(){
@@ -174,8 +171,7 @@ function visible(){
     if (query && !(v.title + ' ' + v.channel).toLowerCase().includes(query)) return false;
     switch (filter){
       case 'indie': return v.tier === 'indie';
-      case 'big': return v.tier !== 'indie' && !v.always;
-      case 'always': return v.always;
+      case 'big': return v.tier !== 'indie';
       case 'short': return v.duration && v.duration < 600;
       case 'long': return v.duration >= 1200;
       case 'unwatched': return !watched.has(v.id);
@@ -185,7 +181,7 @@ function visible(){
 }
 
 function card(v){
-  const tag = v.always ? '<span class="badge always">Always on</span>' : v.tier === 'indie' ? `<span class="badge" title="Under 100K subscribers">Indie${v.subs ? ' · ' + subsTxt(v.subs) : ''}</span>` : '';
+  const tag = v.tier === 'indie' ? `<span class="badge" title="Under 100K subscribers">Indie${v.subs ? ' · ' + subsTxt(v.subs) : ''}</span>` : '';
   const ch = `https://www.youtube.com/channel/${esc(v.channelId)}`;
   return `<div class="v">
     <div class="thumb" data-id="${esc(v.id)}" title="${esc(v.blurb || '')}">
@@ -251,7 +247,6 @@ async function bestOfMonth(){
     if (picked.includes(v) || (per[v.channelId] || 0) >= 2) continue; per[v.channelId] = (per[v.channelId] || 0) + 1; picked.push(v); } };
   take(ok.filter(v => v.tier === 'indie'), 15); take(ok, 30);
   picked.sort((a,b) => s(b) - s(a));
-  for (const v of picked) v.always = v.tier === 'always';
   return { generated: d.generated, count: picked.length, videos: picked, month: true };
 }
 
@@ -269,6 +264,7 @@ async function load(day){
   const nice = d => new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   let days = [];
   try { days = await (await fetch('archive/index.json?t=' + Date.now())).json(); } catch {}
+  try { AV = await (await fetch('avatars.json?t=' + Date.now())).json(); } catch {}
   $('#day').innerHTML = `<option value="">Today</option><option value="month">Best of month</option>` + days.slice(1).map(d => `<option value="${d}">${nice(d)}</option>`).join('');
   $('#days').innerHTML = days.slice(1, 8).map(d =>
     `<button class="item" data-go="${d}"><svg class="ic" viewBox="0 0 24 24"><path d="M17 3V1h-1v2H8V1H7v2H3v18h18V3h-4zm3 17H4V8h16v12z"/></svg><span>${nice(d)}</span></button>`).join('');

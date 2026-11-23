@@ -278,7 +278,7 @@ def vibe_check(videos, key):
     prompt = ("You curate a YouTube homepage for a hardware engineer and maker. Keep videos about building, "
               "making, engineering, science, creative tech and things that make someone feel hopeful or excited "
               "about the future. Drop doom, fear-mongering, economy/markets, politics, news, outrage, drama, "
-              "clickbait gloom and low-effort reaction content. Videos from Fireship or AI Explained are always kept.\n\n"
+              "clickbait gloom and low-effort reaction content. Videos from Fireship are always kept.\n\n"
               "Reply with ONLY a JSON object mapping each kept video id to a short upbeat one-line blurb (max 12 words).\n\n"
               + listing)
     body = json.dumps({"model": os.environ.get("CLAUDE_MODEL", "claude-haiku-5-5"), "max_tokens": 4000,
@@ -494,6 +494,9 @@ def main():
     export.sort(key=lambda v: v["published"], reverse=True)
     json.dump({"generated": now.isoformat(timespec="seconds"), "videos": export},
               open(os.path.join(DOCS, "videos.json"), "w"), separators=(",", ":"))
+    # channel profile pictures, so every page (and older archive days) can show them
+    json.dump({c: a for c, a in avatars.items() if a and c in tier_of},
+              open(os.path.join(DOCS, "avatars.json"), "w"), separators=(",", ":"))
     print(f"Done: {feed['count']} in today's feed, {len(export)} videos tracked this month.")
 
 
